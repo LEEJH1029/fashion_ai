@@ -57,15 +57,43 @@ class GeminiChat:
         hint = GENDER_HINTS["female" if self._is_female else "male"]
         return SYSTEM_INSTRUCTION.strip() + f"\n\n[성별 힌트]\n{hint}"
 
-    def _build_image_prompt(self, style_description: str) -> str:
-        import re
-        # 이모지·한글 특수문자·찍찍 의성어 제거 후 영문/패션 키워드만 남김
-        cleaned = re.sub(r'[^\x00-\x7F]+', ' ', style_description)  # non-ASCII 제거
-        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    def _translate_to_image_prompt(self, korean_style: str) -> str:
+        """한국어 코디 설명 → CoT 기반 영문 이미지 생성 프롬프트 변환"""
+        gender = "young Korean woman" if self._is_female else "young Korean man"
+        request = f"""You are a fashion image prompt engineer. Convert a Korean fashion recommendation into a detailed English image generation prompt using the following Chain-of-Thought steps.
+
+Korean fashion recommendation:
+\"\"\"{korean_style}\"\"\"
+
+Think step by step:
+
+Step 1 - Extract clothing items: Identify each specific clothing item mentioned (tops, bottoms, outerwear, shoes, accessories).
+
+Step 2 - Map to 2025 trends: For each item, map it to the closest current 2025 fashion trend keyword (e.g., quiet luxury, streetcore, Y2K revival, Seoul street style, soft tailoring, oversized silhouette, techwear, etc.).
+
+Step 3 - Add visual details: For each item, add specific visual descriptors (fabric texture, fit, color palette, layering, proportions) that make the outfit look modern and editorial.
+
+Step 4 - Compose final prompt: Write a single English image prompt describing the full outfit in detail. The subject is a {gender}.
+
+Output ONLY the final English prompt from Step 4. No explanations, no Korean, no step labels.
+Format: "wearing [detailed outfit description with trend-accurate styling]"
+"""
+        response = self._client.models.generate_content(
+            model=self._text_model,
+            contents=request,
+            config=types.GenerateContentConfig(
+                max_output_tokens=256,
+                temperature=0.4,
+            ),
+        )
+        return response.text.strip()
+
+    def _build_image_prompt(self, english_style: str) -> str:
         gender = "young Korean woman" if self._is_female else "young Korean man"
         return (
-            f"A full-body fashion editorial photo of a {gender} wearing {cleaned}. "
-            "Seoul street background, natural daylight, high quality, realistic. "
+            f"A full-body fashion editorial photo of a {gender} {english_style}. "
+            "Seoul street background, natural daylight, shot on film camera, "
+            "high quality, photorealistic, fashion magazine style. "
             "No text, no letters, no watermark, no captions, no overlays."
         )
 
@@ -103,8 +131,9 @@ class GeminiChat:
         self._history.append(
             types.Content(role="model", parts=[types.Part(text=reply)])
         )
-        # 나중에 이미지 생성할 때 쓸 코디 설명 저장
-        self._last_style = reply
+        # 한국어 답변을 영문 이미지 프롬프트로 변환해서 저장
+        self._last_style = self._translate_to_image_prompt(reply)
+        print(f"[GeminiChat] image prompt: {self._last_style}")
         return reply
 
     def generate_image(self, style_description: str = "") -> bytes:
