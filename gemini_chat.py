@@ -31,11 +31,13 @@ SYSTEM_INSTRUCTION = """
 
 GENDER_HINTS = {
     "female": "사용자는 여성입니다. 여성 패션 아이템(스커트, 블라우스, 힐 등)을 중심으로 추천하세요.",
-    "male":   "사용자는 남성입니다. 남성 패션 아이템(자켓, 팬츠, 스니커즈 등)을 중심으로 추천하세요.",
+    "male": "사용자는 남성입니다. 남성 패션 아이템(자켓, 팬츠, 스니커즈 등)을 중심으로 추천하세요.",
 }
 
-TEXT_MODEL  = "gemini-2.5-flash-lite"
-IMAGE_MODEL = "gemini-2.5-flash-image"
+TEXT_MODEL = "gemini-2.5-flash-lite"  # 싼 모델
+# TEXT_MODEL  = "gemini-3-flash-preview"    # 비싼 모델
+IMAGE_MODEL = "gemini-2.5-flash-image"  # 싼 모델
+# IMAGE_MODEL = "gemini-3.1-flash-image-preview"  # 비싼 모델
 
 
 class GeminiChat:
@@ -44,12 +46,12 @@ class GeminiChat:
         if not key:
             raise ValueError("API 키를 api_key 인자 또는 GEMINI_API_KEY 환경변수로 전달하세요.")
 
-        self._client      = genai.Client(api_key=key)
-        self._text_model  = text_model
+        self._client = genai.Client(api_key=key)
+        self._text_model = text_model
         self._image_model = image_model
-        self._is_female   = False
-        self._history     = []          # list[types.Content]
-        self._last_style  = ""          # 마지막 코디 설명 (이미지 생성 프롬프트용)
+        self._is_female = False
+        self._history = []  # list[types.Content]
+        self._last_style = ""  # 마지막 코디 설명 (이미지 생성 프롬프트용)
 
     # ── 내부 ──────────────────────────────────────
 
@@ -103,7 +105,7 @@ Format: "wearing [detailed outfit description with trend-accurate styling]"
         self._is_female = is_female
 
     def reset_history(self):
-        self._history    = []
+        self._history = []
         self._last_style = ""
         print("[GeminiChat] 히스토리 초기화")
 
@@ -162,9 +164,10 @@ Format: "wearing [detailed outfit description with trend-accurate styling]"
         parts = candidates[0].content.parts
         print(f"[DEBUG] parts count: {len(parts)}")
         for i, part in enumerate(parts):
-            print(f"[DEBUG] part[{i}] inline_data={part.inline_data is not None}, text={repr(part.text)[:80] if part.text else None}")
+            print(
+                f"[DEBUG] part[{i}] inline_data={part.inline_data is not None}, text={repr(part.text)[:80] if part.text else None}")
             if part.inline_data is not None:
-                return part.inline_data.data   # bytes (PNG)
+                return part.inline_data.data  # bytes (PNG)
 
         raise RuntimeError(f"이미지 데이터를 받지 못했습니다. parts={parts}")
 
